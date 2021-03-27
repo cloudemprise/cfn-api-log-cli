@@ -114,7 +114,7 @@ done
 # Variable Creation
 #-----------------------------
 # Name given to Cloudformation Stack
-STACK_NAME="cfnstack-$PROJECT_NAME"
+STACK_NAME="stack-$PROJECT_NAME"
 echo "The Stack Name ................................: $STACK_NAME"
 # Get Account(ROOT) ID
 AWS_ACC_ID=$(aws sts get-caller-identity --query Account --output text --profile "$AWS_PROFILE" --region "$AWS_REGION")
