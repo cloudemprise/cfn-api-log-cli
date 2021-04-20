@@ -25,7 +25,12 @@ Resources for implementing a comprehensive logging and alerting strategy in an A
 - Cloudwatch logs and alarms.
 - queries to identify trends
 - CloudTrail logs to analyse operational activity for security and compliance.
-- standard SQL to run ad-hoc queries 
+- standard SQL to run ad-hoc queries
+- insights
+- SIEM https://en.wikipedia.org/wiki/Security_information_and_event_management
+- facilitate the human analysis.
+- Some mention of Insight fucntionality.
+- Athena : slice and dice data.
 
 
 ### AWS Services Overview
