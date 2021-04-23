@@ -1,7 +1,9 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  Create Cloudtrail Trail
+  This cloudformation template creates the cloud infrastructure for the logging, analysis and 
+  notification of various api calls made by an AWS Account.
+
 
 # ------------------------------------------
 
@@ -21,7 +23,7 @@ Parameters:
     Description: "The Name given to this Project."
     ConstraintDescription: "Name must satisfy S3 constraints."
     Type: String
-    Default: "cfn-ctrail-cli"
+    Default: "cfn-api-log-cli"
     MinLength: 3
     MaxLength: 63
     AllowedPattern:
@@ -42,7 +44,7 @@ Parameters:
   #CloudTrailPathParameter:
   #  Description: Enter the bucket path for your CloudTrail Logs
   #  Type: String
-  #  Default: !Sub "logs.${ProjectName}/AWSLogs/${AWS::AccountId}/CloudTrail/"
+  #  Default: !Sub "${BucketCTrailLogs}/AWSLogs/${AWS::AccountId}/CloudTrail/"
 
 
 # ==========================================
@@ -62,6 +64,8 @@ Resources:
   # --- CloudTrail Logs Bucket Definition
   BucketCTrailLogs:
     Type: "AWS::S3::Bucket"
+    DeletionPolicy: "Retain"
+    UpdateReplacePolicy: "Retain"
     # .............................
     Properties:
       # .............................
@@ -76,7 +80,9 @@ Resources:
         ServerSideEncryptionConfiguration: 
         - 
           ServerSideEncryptionByDefault: 
-            SSEAlgorithm: "AES256"
+            #SSEAlgorithm: "AES256"
+            SSEAlgorithm: "aws:kms"
+            #KMSMasterKeyID: !Sub "/ce/kms/${AWS::Region}"
 
   # ------------------------------------------
   # --- CloudTrail Logs Bucket Policy
@@ -117,13 +123,14 @@ Resources:
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   # ------------------------------------------
-  # --- Trail Definition
-  CWatchLogsGrp:
+  # --- Log Group Cloudwatch
+  CTrailCWatchLogsGrp:
     Type: "AWS::Logs::LogGroup"
     # .............................
     Properties:
       # .............................
-      LogGroupName: !Sub "logs.${ProjectName}"
+      LogGroupName: !Sub "/ce/${ProjectName}"
+      #KmsKeyId: !Sub "/ce/kms/${AWS::Region}"
 
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -151,7 +158,7 @@ Resources:
       EnableLogFileValidation: true
       IsLogging: true
       # .............................
-      CloudWatchLogsLogGroupArn: !GetAtt CWatchLogsGrp.Arn
+      CloudWatchLogsLogGroupArn: !GetAtt CTrailCWatchLogsGrp.Arn
       CloudWatchLogsRoleArn: !GetAtt CWatchLogsIamRole.Arn
       # .............................
 
@@ -194,14 +201,14 @@ Resources:
             Action:
               - logs:CreateLogStream
             Resource:
-              - !GetAtt CWatchLogsGrp.Arn
+              - !GetAtt CTrailCWatchLogsGrp.Arn
           # ---
           - Sid: "AWSCloudTrailPutLogEvents"
             Effect: Allow
             Action:
               - logs:PutLogEvents
             Resource:
-              - !GetAtt CWatchLogsGrp.Arn
+              - !GetAtt CTrailCWatchLogsGrp.Arn
 
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -239,7 +246,7 @@ Resources:
           EXTERNAL: "TRUE"
         # .............................
         StorageDescriptor:
-          Location: !Sub "s3://logs.cfn-cloudtrail-cli/AWSLogs/${AWS::AccountId}/CloudTrail/"
+          Location: !Sub "s3://${BucketCTrailLogs}/AWSLogs/${AWS::AccountId}/CloudTrail/"
           InputFormat: "com.amazon.emr.cloudtrail.CloudTrailInputFormat"
           OutputFormat: "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
           # .............................
@@ -348,29 +355,29 @@ Resources:
     Properties:
       # .............................
       Database: !Ref CloudTrailLogsGlueDatabase
-      Description: Create Partition for CloudTrail Service Logs
-      Name: CloudTrail Service Logs - Create Partition
+      Description: !Sub "Create Partition for ${ProjectName} CloudTrail Service Logs"
+      Name: !Sub "${ProjectName} : Create Partition"
       QueryString: !Sub
         |-
           -- Partition down to the Day:
           ALTER TABLE ${CloudTrailLogsGlueTable}
           ADD PARTITION (
-                          region = 'eu-west-1', 
+                          region = 'eu-central-1', 
                           YEAR = '2021', 
                           MONTH = '03', 
                           DAY = '19'
                         ) 
-          LOCATION 's3://logs.${ProjectName}/AWSLogs/${AWS::AccountId}/CloudTrail/eu-west-1/2021/03/19/'
+          LOCATION 's3://${BucketCTrailLogs}/AWSLogs/${AWS::AccountId}/CloudTrail/eu-central-1/2021/03/19/'
 
           -- Partition down to the Month:
           ALTER TABLE ${CloudTrailLogsGlueTable}
           ADD PARTITION (
-                          region = 'eu-west-1', 
+                          region = 'eu-central-1', 
                           YEAR = '2021', 
                           MONTH = '03', 
                           DAY = '*'
                         ) 
-          LOCATION 's3://logs.${ProjectName}/AWSLogs/${AWS::AccountId}/CloudTrail/eu-west-1/2021/03/'
+          LOCATION 's3://${BucketCTrailLogs}/AWSLogs/${AWS::AccountId}/CloudTrail/eu-central-1/2021/03/'
   # ------------------------------------------
 
   # ------------------------------------------
@@ -381,8 +388,8 @@ Resources:
     Properties:
       # .............................
       Database: !Ref CloudTrailLogsGlueDatabase
-      Description: Queries for CloudTrail Service Logs
-      Name: CloudTrail Service Logs - Queries
+      Description: !Sub "Queries for ${ProjectName} CloudTrail Service Logs"
+      Name: !Sub "${ProjectName} : Queries"
       QueryString: !Sub
         |-
           -- Simple wide search
@@ -406,7 +413,7 @@ Resources:
           FROM
             ${CloudTrailLogsGlueTable} 
           WHERE
-            region = 'eu-west-1' 
+            region = 'eu-central-1' 
             AND YEAR = '2021' 
             AND MONTH = '03' 
             AND DAY = '19' LIMIT 100;
@@ -436,7 +443,7 @@ Resources:
           FROM
             ${CloudTrailLogsGlueTable} 
           WHERE
-            region = 'eu-west-1' 
+            region = 'eu-central-1' 
             AND YEAR = '2021' 
             AND MONTH = '03' 
             AND DAY = '19' 
@@ -607,6 +614,37 @@ Resources:
             eventtime ASC LIMIT 10;
   # ------------------------------------------
 
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #         SNS NOTIFICATIONS
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+  # ------------------------------------------
+  # --- SNS Topic Definition
+  CTrailNoticeTopic:
+    Type: "AWS::SNS::Topic"
+    # .............................
+    Properties:
+      DisplayName: "Cloudtrail Events Bulletin"
+      TopicName: !Sub "${ProjectName}-bulletin"
+      #KmsMasterKeyId: !Sub "/ce/kms/${AWS::Region}"
+      # .............................
+      Tags:
+        -
+          Key: "Name"
+          Value: !Sub "${ProjectName}-bulletin"
+      # ------------------------------------------
+
+  # ------------------------------------------
+  # --- SNS Subscription Definition
+  CTrailNotificationSubscription:
+    Type: "AWS::SNS::Subscription"
+    # .............................
+    Properties:
+      TopicArn: !Ref CTrailNoticeTopic
+      Endpoint: !Ref EmailAddrSNS
+      Protocol: "email"
+      # ------------------------------------------
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #    CLOUDWATCH CLOUDTRAIL METRIC ALARMS
@@ -614,7 +652,487 @@ Resources:
 
 
   # ------------------------------------------
-  # --- Athena Create Partition
+  # --- KMS Changes Metric 1
+  CTrailMetricKmsChanges:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        "{($.eventName=CreateAlias)||($.eventName=CreateKey)||($.eventName=Decrypt)||
+        ($.eventName=DeleteAlias)||($.eventName=DeleteImportedKeyMaterial)||
+        ($.eventName=DeleteImportedKeyMaterial)||($.eventName=DisableKey)||
+        ($.eventName=DisableKeyRotation)||($.eventName=EnableKey)||
+        ($.eventName=EnableKeyRotation)||($.eventName=Encrypt)||($.eventName=GenerateDataKey)||
+        ($.eventName=GenerateDataKeyPair)||($.eventName=GenerateDataKeyPairWithoutPlaintext)||
+        ($.eventName=GenerateDataKeyWithoutPlaintext)||($.eventName=GenerateRandom)||
+        ($.eventName=ImportKeyMaterial)||($.eventName=ReEncryptFrom)||($.eventName=ReEncryptTo)||
+        ($.eventName=ScheduleKeyDeletion)||($.eventName=Sign)||($.eventName=UpdateAlias)||
+        ($.eventName=Verify)||($.eventName=CreateGrant)||($.eventName=PutKeyPolicy)||
+        ($.eventName=RetireGrant)||($.eventName=RevokeGrant)}"
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-kms"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- KMS Notification Alarm
+  CTrailAlarmKmsChanges:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-kms-events"
+      AlarmDescription:
+        "KMS API calls to Write or Permissions Management."
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-kms"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
+
+  # ------------------------------------------
+  # --- Security Group Changes Metric 2
+  CTrailMetricSecurityGrpChanges:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        "{($.eventName=AuthorizeSecurityGroupIngress)||($.eventName=AuthorizeSecurityGroupEgress)
+        ||($.eventName=RevokeSecurityGroupIngress)||($.eventName=RevokeSecurityGroupEgress)
+        ||($.eventName=CreateSecurityGroup)||($.eventName=DeleteSecurityGroup)}"
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-security-group"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- Security Group Notification Alarm
+  CTrailAlarmSecurityGrpChanges:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-security-group-events"
+      AlarmDescription:
+        "Security Groups API calls Create, Update or Delete."
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-security-group"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
+
+  # ------------------------------------------
+  # --- Network ACL Changes Metric 3
+  CTrailMetricNetworkAclChanges:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        "{($.eventName=CreateNetworkAcl)||($.eventName=CreateNetworkAclEntry)||
+        ($.eventName=DeleteNetworkAcl)||($.eventName=DeleteNetworkAclEntry)||
+        ($.eventName=ReplaceNetworkAclEntry)||($.eventName=ReplaceNetworkAclAssociation)}"
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-network-acl"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- Network ACL Notification Alarm
+  CTrailAlarmNetworkAclChanges:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-network-acl-events"
+      AlarmDescription:
+        "Network ACL API calls Create, Update or Delete."
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-network-acl"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
+
+  # ------------------------------------------
+  # --- Gateway Changes Metric 4
+  CTrailMetricGatewayChanges:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        "{($.eventName=CreateCustomerGateway)||($.eventName=DeleteCustomerGateway)
+        ||($.eventName=AttachInternetGateway)||($.eventName=CreateInternetGateway)
+        ||($.eventName=DeleteInternetGateway)||($.eventName=DetachInternetGateway)}"
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-gateway"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- Gateway Notification Alarm
+  CTrailAlarmGatewayChanges:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-gateway-events"
+      AlarmDescription:
+        "Internet Gateway API calls Create, Update or Delete."
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-gateway"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
+
+  # ------------------------------------------
+  # --- Vpc Changes Metric 5
+  CTrailMetricVpcChanges:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        "{($.eventName=CreateVpc)||($.eventName=DeleteVpc)||($.eventName=ModifyVpcAttribute)
+        ||($.eventName=AcceptVpcPeeringConnection)||($.eventName=CreateVpcPeeringConnection)
+        ||($.eventName=DeleteVpcPeeringConnection)||($.eventName=RejectVpcPeeringConnection)
+        ||($.eventName=AttachClassicLinkVpc)||($.eventName=DetachClassicLinkVpc)
+        ||($.eventName=DisableVpcClassicLink)||($.eventName=EnableVpcClassicLink)}"
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-vpc"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- Vpc Notification Alarm
+  CTrailAlarmVpcChanges:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-vpc-events"
+      AlarmDescription:
+        "Vpc API calls Create, Update or Delete."
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-vpc"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
+
+  # ------------------------------------------
+  # --- Ec2Instance Changes Metric 6
+  CTrailMetricEc2InstanceChanges:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        "{($.eventName=RunInstances)||($.eventName=RebootInstances)||
+        ($.eventName=StartInstances)||($.eventName=StopInstances)||
+        ($.eventName=TerminateInstances)}"
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-ec2instance"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- Ec2Instance Notification Alarm
+  CTrailAlarmEc2InstanceChanges:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-ec2instance-events"
+      AlarmDescription:
+        "Ec2Instance API calls Create, Terminate, Start, Stop or Reboot."
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-ec2instance"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
+
+  # ------------------------------------------
+  # --- Ec2LargeInstance Changes Metric 7
+  CTrailMetricEc2LargeInstanceChanges:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        "{($.eventName=RunInstances)&&(($.requestParameters.instanceType=*.8xlarge)
+        ||($.requestParameters.instanceType=*.4xlarge))}"
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-ec2large-instance"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- Ec2LargeInstance Notification Alarm
+  CTrailAlarmEc2LargeInstanceChanges:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-ec2large-instance-events"
+      AlarmDescription:
+        "Ec2LargeInstance API calls Create, Terminate, Start, Stop or Reboot."
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-ec2large-instance"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
+
+  # ------------------------------------------
+  # --- CloudTrail Changes Metric 8
+  CTrailMetricCloudTrailChanges:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        "{($.eventName=CreateTrail)||($.eventName=UpdateTrail)
+        ||($.eventName=DeleteTrail)||($.eventName=StartLogging)
+        ||($.eventName=StopLogging)}"
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-cloudtrail"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- CloudTrail Notification Alarm
+  CTrailAlarmCloudTrailChanges:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-cloudtrail-events"
+      AlarmDescription: 
+        "CloudTrail API calls Create, Update or Delete as well as Start or Stop Logging"
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-cloudtrail"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
+
+  # ------------------------------------------
+  # --- IamPolicy Changes Metric 9
+  CTrailMetricIamPolicyChanges:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        "{($.eventName=DeleteGroupPolicy)||($.eventName=DeleteRolePolicy)||
+        ($.eventName=DeleteUserPolicy)||($.eventName=PutGroupPolicy)||
+        ($.eventName=PutRolePolicy)||($.eventName=PutUserPolicy)||
+        ($.eventName=CreatePolicy)||($.eventName=DeletePolicy)||
+        ($.eventName=CreatePolicyVersion)||($.eventName=DeletePolicyVersion)||
+        ($.eventName=AttachRolePolicy)||($.eventName=DetachRolePolicy)||
+        ($.eventName=AttachUserPolicy)||($.eventName=DetachUserPolicy)||
+        ($.eventName=AttachGroupPolicy)||($.eventName=DetachGroupPolicy)}"
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-iam-policy"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- IamPolicy Notification Alarm
+  CTrailAlarmIamPolicyChanges:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-iam-policy-events"
+      AlarmDescription:
+        "Iam Policy API calls Create, Update or Delete."
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-iam-policy"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
+
+  # ------------------------------------------
+  # --- Console SignIn Failures Metric 10
+  CTrailMetricConsoleSignInFailures:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        '{($.eventName=ConsoleLogin)&&($.errorMessage="Failed authentication")}'
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-signin-fail"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- Console SignIn Failures Notification Alarm
+  CTrailAlarmConsoleSignInFailures:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-signin-fail-events"
+      AlarmDescription:
+        "Console SignIn API Failures."
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-signin-fail"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
+
+  # ------------------------------------------
+  # --- Authorization Failures Metric 11
+  CTrailMetricAuthorizationFailures:
+    Type: AWS::Logs::MetricFilter
+    # .............................
+    Properties:
+      # .............................
+      LogGroupName: !Ref CTrailCWatchLogsGrp
+      FilterPattern:
+        '{($.errorCode="*UnauthorizedOperation")||($.errorCode="AccessDenied*")}'
+      MetricTransformations:
+        - MetricName: !Sub "${ProjectName}-authorization-fail"
+          MetricNamespace: !Sub "${ProjectName}-metrics"
+          MetricValue: "1"
+          DefaultValue: 0
+  # ------------------------------------------
+  # --- Authorization Failures Notification Alarm
+  CTrailAlarmAuthorizationFailures:
+    Type: "AWS::CloudWatch::Alarm"
+    # .............................
+    Properties:
+      # .............................
+      AlarmName: !Sub "${ProjectName}-authorization-fail-events"
+      AlarmDescription:
+        "Authorization Failure API calls."
+      # .............................
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref CTrailNoticeTopic
+      # .............................
+      MetricName: !Sub "${ProjectName}-authorization-fail"
+      Namespace: !Sub "${ProjectName}-metrics"
+      Statistic: "Sum"
+      # .............................
+      ComparisonOperator: "GreaterThanOrEqualToThreshold"
+      # .............................
+      EvaluationPeriods: 1
+      Threshold: 1
+      Period: 300
+  # ------------------------------------------
 
 
 # ==========================================

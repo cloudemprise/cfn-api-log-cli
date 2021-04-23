@@ -66,7 +66,7 @@ done
 
 #-----------------------------
 # Request Project Name
-PROJECT_NAME="cfn-ctrail-cli"
+PROJECT_NAME="cfn-api-log-cli"
 while true
 do
   # -e : stdin from terminal
@@ -79,7 +79,7 @@ do
     echo "Project Name is valid .........................: $USER_INPUT"
     PROJECT_NAME=$USER_INPUT
     # Doc Store for this project
-    PROJECT_BUCKET="proj.${PROJECT_NAME}"
+    PROJECT_BUCKET="proj-${PROJECT_NAME}"
     break
   else
     echo "Error! Project Name must be S3 Compatible .....: $USER_INPUT"
@@ -114,7 +114,7 @@ done
 # Variable Creation
 #-----------------------------
 # Name given to Cloudformation Stack
-STACK_NAME="stack-$PROJECT_NAME"
+STACK_NAME="$PROJECT_NAME-stack"
 echo "The Stack Name ................................: $STACK_NAME"
 # Get Account(ROOT) ID
 AWS_ACC_ID=$(aws sts get-caller-identity --query Account --output text --profile "$AWS_PROFILE" --region "$AWS_REGION")
@@ -209,7 +209,7 @@ find -L ./cfn-templates -type f -name "*.yaml" ! -path "*/scratch/*" -print0 |
 #-----------------------------
 # Stage1 Stack Creation Code Block
 BUILD_COUNTER="stage1"
-TEMPLATE_URL="https://${PROJECT_BUCKET}.s3.${AWS_REGION}.amazonaws.com/cfn-templates/cfn-ctrail-cli.yaml"
+TEMPLATE_URL="https://${PROJECT_BUCKET}.s3.${AWS_REGION}.amazonaws.com/cfn-templates/cfn-api-log-cli.yaml"
 echo "Cloudformation Stack Creation Initiated .......: $TEMPLATE_URL"
 
 TIME_START_STACK=$(date +%s)
