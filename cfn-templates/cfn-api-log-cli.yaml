@@ -80,8 +80,8 @@ Resources:
         ServerSideEncryptionConfiguration: 
         - 
           ServerSideEncryptionByDefault: 
-            #SSEAlgorithm: "AES256"
-            SSEAlgorithm: "aws:kms"
+            SSEAlgorithm: "AES256"
+            #SSEAlgorithm: "aws:kms"
             #KMSMasterKeyID: !Sub "/ce/kms/${AWS::Region}"
 
   # ------------------------------------------
@@ -224,8 +224,10 @@ Resources:
       # .............................
       CatalogId: !Ref AWS::AccountId
       DatabaseInput: 
-        Description: CloudTrail Service Logs Glue Data Catalog
-        Name: "db_cloudtrail_service_logs"
+        Description: !Sub "${ProjectName} : Glue Database"
+        #Name: "db_cloudtrail_service_logs"
+        Name: "db_cfn_api_log_cli"
+
 
   # ------------------------------------------
   # --- Glue Create Table Defn
@@ -238,7 +240,7 @@ Resources:
       DatabaseName: !Ref CloudTrailLogsGlueDatabase
       # .............................
       TableInput:
-        Description: "CloudTrail Service Logs"
+        Description: !Sub "${ProjectName} : Glue Table"
         Name: !Join ["_", ["tbl", !Select [1, !Split ["db_", !Ref CloudTrailLogsGlueDatabase]]]]
         TableType: "EXTERNAL_TABLE"
         # .............................
@@ -348,15 +350,46 @@ Resources:
 
 
   # ------------------------------------------
+  # --- Athena Work Group
+  CloudTrailWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    # .............................
+    Properties:
+      # .............................
+      Name: !Sub "${ProjectName}-workgrp"
+      Description: !Sub "${ProjectName} : Work Group"
+      # .............................
+      Tags:
+        -
+          Key: "Project"
+          Value: !Sub "${ProjectName}"
+        -
+          Key: "Name"
+          Value: !Sub "${ProjectName}-workgrp"
+      # .............................
+      RecursiveDeleteOption: true
+      WorkGroupConfiguration:
+        PublishCloudWatchMetricsEnabled: true
+        ResultConfiguration:
+          OutputLocation: !Sub "s3://${BucketCTrailLogs}/Athena/"
+          EncryptionConfiguration:
+            # CSE_KMS | SSE_KMS | SSE_S3
+            EncryptionOption: "SSE_S3"
+            #KmsKey: 
+  # ------------------------------------------
+
+
+  # ------------------------------------------
   # --- Athena Create Partition
   CloudTrailPartition:
     Type: AWS::Athena::NamedQuery
     # .............................
     Properties:
       # .............................
+      Name: !Sub "${ProjectName}-create-partition"
+      Description: "Create Partition for CloudTrail Service Logs"
       Database: !Ref CloudTrailLogsGlueDatabase
-      Description: !Sub "Create Partition for ${ProjectName} CloudTrail Service Logs"
-      Name: !Sub "${ProjectName} : Create Partition"
+      WorkGroup: !Ref CloudTrailWorkGroup
       QueryString: !Sub
         |-
           -- Partition down to the Day:
@@ -387,9 +420,11 @@ Resources:
     # .............................
     Properties:
       # .............................
+      Name: !Sub "${ProjectName}-queries"
+      Description: "Create Queries for CloudTrail Service Logs"
       Database: !Ref CloudTrailLogsGlueDatabase
-      Description: !Sub "Queries for ${ProjectName} CloudTrail Service Logs"
-      Name: !Sub "${ProjectName} : Queries"
+      WorkGroup: !Ref CloudTrailWorkGroup
+      # .............................
       QueryString: !Sub
         |-
           -- Simple wide search
