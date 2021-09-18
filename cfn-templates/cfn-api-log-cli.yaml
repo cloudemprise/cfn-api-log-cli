@@ -661,13 +661,13 @@ Resources:
     # .............................
     Properties:
       DisplayName: "Cloudtrail Events Bulletin"
-      TopicName: !Sub "${ProjectName}-bulletin"
+      TopicName: !Sub "${ProjectName}-bulletin-${AWS::Region}"
       #KmsMasterKeyId: !Sub "/ce/kms/${AWS::Region}"
       # .............................
       Tags:
         -
           Key: "Name"
-          Value: !Sub "${ProjectName}-bulletin"
+          Value: !Sub "${ProjectName}-bulletin-${AWS::Region}"
       # ------------------------------------------
 
   # ------------------------------------------

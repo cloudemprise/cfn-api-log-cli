@@ -30,7 +30,7 @@ do
   # -p : prompt on stderr
   # -i : use default buffer val
   read -er -i "$AWS_PROFILE" -p "Enter Project AWS CLI Named Profile ...........: " USER_INPUT
-  if aws configure list-profiles 2>/dev/null | fgrep -qw "$USER_INPUT"
+  if aws configure list-profiles 2>/dev/null | grep -qw -- "$USER_INPUT"
   then
     echo "Project AWS CLI Named Profile is valid ........: $USER_INPUT"
     AWS_PROFILE=$USER_INPUT
@@ -52,7 +52,7 @@ do
   # -p : prompt on stderr
   # -i : use default buffer val
   read -er -i "$AWS_REGION" -p "Enter Project AWS CLI Region ..................: " USER_INPUT
-  if aws ec2 describe-regions --profile "$AWS_PROFILE" --query 'Regions[].RegionName' --output text 2>/dev/null | fgrep -qw "$USER_INPUT"
+  if aws ec2 describe-regions --profile "$AWS_PROFILE" --query 'Regions[].RegionName' --output text 2>/dev/null | grep -qw -- "$USER_INPUT"
   then
     echo "Project AWS CLI Region is valid ...............: $USER_INPUT"
     AWS_REGION=$USER_INPUT
