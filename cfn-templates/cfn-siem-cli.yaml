@@ -32,7 +32,7 @@ Parameters:
   # ------------------------------------------
   # --- SNS Email Notifications
   EmailAddrSNS:
-    Description: "Openvpn SNS Email Endpoint"
+    Description: "SNS Email Endpoint"
     ConstraintDescription: "Must be a valid email address"
     Type: String
     Default: "dh.info@posteo.net"
@@ -57,6 +57,36 @@ Resources:
 
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #         CLOUDTRAIL DEFINITION
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  # ------------------------------------------
+  # --- Trail Definition
+  CTrailTrail:
+    Type: "AWS::CloudTrail::Trail"
+    # .............................
+    Properties:
+      # .............................
+      TrailName: !Sub "${ProjectName}-trail"
+      # .............................
+      Tags:
+        -
+          Key: "Project"
+          Value: !Sub "${ProjectName}"
+      # .............................
+      S3BucketName: !Ref BucketCTrailLogs
+      # .............................
+      IncludeGlobalServiceEvents: true
+      IsMultiRegionTrail: true
+      EnableLogFileValidation: true
+      IsLogging: true
+      # .............................
+      CloudWatchLogsLogGroupArn: !GetAtt CTrailCWatchLogsGrp.Arn
+      CloudWatchLogsRoleArn: !GetAtt CWatchLogsIamRole.Arn
+      # .............................
+
+
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #         S3 BUCKET DEFINITIONS
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -74,7 +104,7 @@ Resources:
           Key: "Project"
           Value: !Sub "${ProjectName}"
       # .............................
-      BucketName: !Sub "logs.${ProjectName}"
+      BucketName: !Sub "${ProjectName}-logs"
       # .............................
       BucketEncryption: 
         ServerSideEncryptionConfiguration: 
@@ -134,36 +164,6 @@ Resources:
 
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  #         CLOUDTRAIL DEFINITIONS
-  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-  # ------------------------------------------
-  # --- Trail Definition
-  CTrailTrail:
-    Type: "AWS::CloudTrail::Trail"
-    # .............................
-    Properties:
-      # .............................
-      TrailName: !Sub "${ProjectName}-trail"
-      # .............................
-      Tags:
-        -
-          Key: "Project"
-          Value: !Sub "${ProjectName}"
-      # .............................
-      S3BucketName: !Ref BucketCTrailLogs
-      # .............................
-      IncludeGlobalServiceEvents: true
-      IsMultiRegionTrail: true
-      EnableLogFileValidation: true
-      IsLogging: true
-      # .............................
-      CloudWatchLogsLogGroupArn: !GetAtt CTrailCWatchLogsGrp.Arn
-      CloudWatchLogsRoleArn: !GetAtt CWatchLogsIamRole.Arn
-      # .............................
-
-
-  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #         IAM POLICIES & ROLES DEFINITIONS
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -174,8 +174,8 @@ Resources:
     # .............................
     Properties:
       # .............................
-      RoleName: !Sub "role.${ProjectName}.cwatch.${AWS::Region}"
-      Path: "/service-role/"
+      RoleName: !Sub "${ProjectName}.cwatch-role"
+      Path: "/ce/service-role/"
       MaxSessionDuration: 3600
       AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"cloudtrail.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
       ManagedPolicyArns: 
@@ -188,12 +188,12 @@ Resources:
     # .............................
     Properties:
       # .............................
-      ManagedPolicyName: !Sub "service.${ProjectName}.cwatch.${AWS::Region}"
-      Path: "/service-role/"
+      ManagedPolicyName: !Sub "${ProjectName}.cwatch-service"
+      Path: "/ce/service-role/"
       # .............................
       PolicyDocument: 
         Version: "2012-10-17"
-        Id: !Sub "service.${ProjectName}.cwatch"
+        Id: !Sub "${ProjectName}.cwatch-service"
         Statement:
           # ---
           - Sid: "AWSCloudTrailCreateLogStream"
@@ -225,8 +225,7 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseInput: 
         Description: !Sub "${ProjectName} : Glue Database"
-        #Name: "db_cloudtrail_service_logs"
-        Name: "db_cfn_api_log_cli"
+        Name: "db_cfn_siem_cli"
 
 
   # ------------------------------------------
@@ -661,13 +660,13 @@ Resources:
     # .............................
     Properties:
       DisplayName: "Cloudtrail Events Bulletin"
-      TopicName: !Sub "${ProjectName}-bulletin-${AWS::Region}"
+      TopicName: !Sub "${ProjectName}-bulletin"
       #KmsMasterKeyId: !Sub "/ce/kms/${AWS::Region}"
       # .............................
       Tags:
         -
           Key: "Name"
-          Value: !Sub "${ProjectName}-bulletin-${AWS::Region}"
+          Value: !Sub "${ProjectName}-bulletin"
       # ------------------------------------------
 
   # ------------------------------------------
@@ -722,7 +721,7 @@ Resources:
       AlarmDescription:
         "KMS API calls to Write or Permissions Management."
       # .............................
-      ActionsEnabled: true
+      ActionsEnabled: false
       AlarmActions:
         - !Ref CTrailNoticeTopic
       # .............................
@@ -765,7 +764,7 @@ Resources:
       AlarmDescription:
         "Security Groups API calls Create, Update or Delete."
       # .............................
-      ActionsEnabled: true
+      ActionsEnabled: false
       AlarmActions:
         - !Ref CTrailNoticeTopic
       # .............................
@@ -808,7 +807,7 @@ Resources:
       AlarmDescription:
         "Network ACL API calls Create, Update or Delete."
       # .............................
-      ActionsEnabled: true
+      ActionsEnabled: false
       AlarmActions:
         - !Ref CTrailNoticeTopic
       # .............................
@@ -851,7 +850,7 @@ Resources:
       AlarmDescription:
         "Internet Gateway API calls Create, Update or Delete."
       # .............................
-      ActionsEnabled: true
+      ActionsEnabled: false
       AlarmActions:
         - !Ref CTrailNoticeTopic
       # .............................
@@ -896,7 +895,7 @@ Resources:
       AlarmDescription:
         "Vpc API calls Create, Update or Delete."
       # .............................
-      ActionsEnabled: true
+      ActionsEnabled: false
       AlarmActions:
         - !Ref CTrailNoticeTopic
       # .............................
@@ -939,7 +938,7 @@ Resources:
       AlarmDescription:
         "Ec2Instance API calls Create, Terminate, Start, Stop or Reboot."
       # .............................
-      ActionsEnabled: true
+      ActionsEnabled: false
       AlarmActions:
         - !Ref CTrailNoticeTopic
       # .............................
@@ -1072,7 +1071,7 @@ Resources:
       AlarmDescription:
         "Iam Policy API calls Create, Update or Delete."
       # .............................
-      ActionsEnabled: true
+      ActionsEnabled: false
       AlarmActions:
         - !Ref CTrailNoticeTopic
       # .............................

@@ -66,7 +66,7 @@ done
 
 #-----------------------------
 # Request Project Name
-PROJECT_NAME="cfn-api-log-cli"
+PROJECT_NAME="cfn-siem-cli"
 while true
 do
   # -e : stdin from terminal
@@ -79,7 +79,7 @@ do
     echo "Project Name is valid .........................: $USER_INPUT"
     PROJECT_NAME=$USER_INPUT
     # Doc Store for this project
-    PROJECT_BUCKET="proj-${PROJECT_NAME}"
+    PROJECT_BUCKET="${PROJECT_NAME}-proj"
     break
   else
     echo "Error! Project Name must be S3 Compatible .....: $USER_INPUT"
@@ -209,7 +209,7 @@ find -L ./cfn-templates -type f -name "*.yaml" ! -path "*/scratch/*" -print0 |
 #-----------------------------
 # Stage1 Stack Creation Code Block
 BUILD_COUNTER="stage1"
-TEMPLATE_URL="https://${PROJECT_BUCKET}.s3.${AWS_REGION}.amazonaws.com/cfn-templates/cfn-api-log-cli.yaml"
+TEMPLATE_URL="https://${PROJECT_BUCKET}.s3.${AWS_REGION}.amazonaws.com/cfn-templates/cfn-siem-cli.yaml"
 echo "Cloudformation Stack Creation Initiated .......: $TEMPLATE_URL"
 
 TIME_START_STACK=$(date +%s)
