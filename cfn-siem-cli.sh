@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # debug options include -v -x
-# cfn-ctrail-cli.sh 
+# cfn-siem-cli.sh 
 
 
 #!! COMMENT Construct Begins Here:

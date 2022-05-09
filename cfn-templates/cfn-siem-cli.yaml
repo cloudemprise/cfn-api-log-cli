@@ -1,8 +1,8 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  This cloudformation template creates the cloud infrastructure for the logging, analysis and 
-  notification of various api calls made by an AWS Account.
+  This cloudformation template creates the cloud infrastructure for the logging, 
+  analysis and notification of various api calls made by an AWS Account.
 
 
 # ------------------------------------------
@@ -23,7 +23,7 @@ Parameters:
     Description: "The Name given to this Project."
     ConstraintDescription: "Name must satisfy S3 constraints."
     Type: String
-    Default: "cfn-api-log-cli"
+    Default: "cfn-siem-cli"
     MinLength: 3
     MaxLength: 63
     AllowedPattern:
